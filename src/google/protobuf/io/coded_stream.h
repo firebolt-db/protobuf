@@ -1048,7 +1048,7 @@ class PROTOBUF_EXPORT CodedOutputStream {
 
   // Destroy the CodedOutputStream and position the underlying
   // ZeroCopyOutputStream immediately after the last byte written.
-  ~CodedOutputStream();
+  ~CodedOutputStream() noexcept(false);
 
   // Returns true if there was an underlying I/O error since this object was
   // created. On should call Trim before this function in order to catch all

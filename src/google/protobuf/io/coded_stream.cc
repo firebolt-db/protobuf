@@ -817,10 +817,29 @@ uint8_t* EpsCopyOutputStream::GetDirectBufferForNBytesAndAdvance(int size,
   }
 }
 
+namespace {
+class Guard {
+public:
+    Guard(std::function<void()> fn) : fn_(std::move(fn)) {}
+    void dismiss() { dismissed_ = true; }
+    ~Guard() {
+        if (PROTOBUF_PREDICT_FALSE(!dismissed_)) {
+            fn_();
+        }
+    }
+
+private:
+    std::function<void()> fn_;
+    bool dismissed_{false};
+  };
+}  // namespace
+
 uint8_t* EpsCopyOutputStream::Next() {
   ABSL_DCHECK(!had_error_);  // NOLINT
   if (PROTOBUF_PREDICT_FALSE(stream_ == nullptr)) return Error();
   if (buffer_end_) {
+    Guard g([this] { Error(); });
+
     // We're in the patch buffer and need to fill up the previous buffer.
     std::memcpy(buffer_end_, buffer_, end_ - buffer_);
     uint8_t* ptr;
@@ -830,10 +849,12 @@ uint8_t* EpsCopyOutputStream::Next() {
       if (PROTOBUF_PREDICT_FALSE(!stream_->Next(&data, &size))) {
         // Stream has an error, we use the patch buffer to continue to be
         // able to write.
+        g.dismiss();
         return Error();
       }
       ptr = static_cast<uint8_t*>(data);
     } while (size == 0);
+    g.dismiss();
     if (PROTOBUF_PREDICT_TRUE(size > kSlopBytes)) {
       std::memcpy(ptr, end_, kSlopBytes);
       end_ = ptr + size - kSlopBytes;
@@ -996,7 +1017,7 @@ uint8_t* EpsCopyOutputStream::WriteCordOutline(const absl::Cord& c, uint8_t* ptr
 std::atomic<bool> CodedOutputStream::default_serialization_deterministic_{
     false};
 
-CodedOutputStream::~CodedOutputStream() { Trim(); }
+CodedOutputStream::~CodedOutputStream() noexcept(false) { Trim(); }
 
 uint8_t* CodedOutputStream::WriteCordToArray(const absl::Cord& cord,
                                              uint8_t* target) {
