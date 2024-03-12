@@ -80,7 +80,7 @@ CodedInputStream::~CodedInputStream() {
 }
 
 // Static.
-int CodedInputStream::default_recursion_limit_ = 100;
+int CodedInputStream::default_recursion_limit_ = 1000;
 
 
 void CodedInputStream::BackUpInputToCurrentPosition() {
